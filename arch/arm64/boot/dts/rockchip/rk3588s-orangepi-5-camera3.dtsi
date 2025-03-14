@@ -18,14 +18,14 @@
 
 			mipi_in_dcphy0: endpoint@0 {
 				reg = <0>;
-				remote-endpoint = <&ov13850_out1>;
-				data-lanes = <1 2>;
+				remote-endpoint = <&imx415_out2>;
+				data-lanes = <1 2 3 4>;
 			};
 
 			mipi_in_dcphy1: endpoint@1 {
 				reg = <1>;
 				remote-endpoint = <&ov13855_out1>;
-				data-lanes = <1 2>;
+				data-lanes = <1 2 3 4>;
 			};
 		};
 
@@ -53,26 +53,27 @@
 		rockchip,camera-module-facing = "front";
 	};
 
-	ov13850_3: ov13850@10 {
-		compatible = "ovti,ov13850";
+	imx415_3: imx415@1a {
+		compatible = "sony,imx415";
 		status = "disabled";
-		reg = <0x10>;
+		reg = <0x1a>;
 		clocks = <&cru CLK_MIPI_CAMARAOUT_M4>;
 		clock-names = "xvclk";
 		pinctrl-names = "default";
 		pinctrl-0 = <&mipim0_camera4_clk>;
 		rockchip,grf = <&sys_grf>;
-		reset-gpios = <&gpio1 RK_PA6 GPIO_ACTIVE_HIGH>;
-		pwdn-gpios = <&gpio3 RK_PC5 GPIO_ACTIVE_HIGH>;
-		rockchip,camera-module-index = <1>;
-		rockchip,camera-module-facing = "front";
-		rockchip,camera-module-name = "CMK-CT0116";
-		rockchip,camera-module-lens-name = "default";
-		lens-focus = <&vm149cp1>;
+		power-domains = <&power RK3588_PD_VI>;
+		reset-gpios = <&gpio1 RK_PA6 GPIO_ACTIVE_LOW>;
+		power-gpios = <&gpio3 RK_PC5 GPIO_ACTIVE_HIGH>;
+		orangepi,clkout-enabled-index = <0>;
+		rockchip,camera-module-index = <0>;
+		rockchip,camera-module-facing = "back";
+		rockchip,camera-module-name = "RADXA-CAMERA-4K";
+		rockchip,camera-module-lens-name = "DEFAULT";
 		port {
-			ov13850_out1: endpoint {
+			imx415_out2: endpoint {
 				remote-endpoint = <&mipi_in_dcphy0>;
-				data-lanes = <1 2>;
+				data-lanes = <1 2 3 4>;
 			};
 		};
 	};
@@ -107,7 +108,7 @@
 		port {
 			ov13855_out1: endpoint {
 				remote-endpoint = <&mipi_in_dcphy1>;
-				data-lanes = <1 2>;
+				data-lanes = <1 2 3 4>;
 			};
 		};
 	};
