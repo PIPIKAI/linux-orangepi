@@ -65,7 +65,9 @@
 #define JPGDEC_REG_PIC_INFO_INDEX	(3)
 #define JPGDEC_GET_WIDTH(x)		(((x) & 0xffff) + 1)
 #define JPGDEC_GET_HEIGHT(x)		((((x) >> 16) & 0xffff) + 1)
-
+#define JPGDEC_REG_STRM_LEN_BASE	0x020
+#define JPGDEC_REG_STRM_LEN_BASE_INDEX	(8)
+#define JPGDEC_GET_STRM_LEN(x)		((((x) >> 4) & 0xfffffff))
 #define JPGDEC_REG_STREAM_RLC_BASE		0x030
 #define JPGDEC_REG_STREAM_RLC_BASE_INDEX	(12)
 
@@ -129,6 +131,17 @@ static int jpgdec_process_reg_fd(struct mpp_session *session,
 				 struct mpp_task_msgs *msgs)
 {
 	int ret = 0;
+	int fd_bs = -1;
+	int ofst_strm = 0;
+
+	if (session->msg_flags & MPP_FLAGS_REG_NO_OFFSET) {
+		fd_bs = task->reg[JPGDEC_REG_STREAM_RLC_BASE_INDEX];
+		ofst_strm = mpp_query_reg_offset_info(&task->off_inf,
+						JPGDEC_REG_STREAM_RLC_BASE_INDEX);
+	} else {
+		fd_bs = task->reg[JPGDEC_REG_STREAM_RLC_BASE_INDEX] & 0x3ff;
+		ofst_strm = task->reg[JPGDEC_REG_STREAM_RLC_BASE_INDEX] >> 10 << 4;
+	}
 
 	ret = mpp_translate_reg_address(session, &task->mpp_task,
 					JPEGDEC_FMT_DEFAULT, task->reg, &task->off_inf);
@@ -137,6 +150,19 @@ static int jpgdec_process_reg_fd(struct mpp_session *session,
 
 	mpp_translate_reg_offset_info(&task->mpp_task,
 				      &task->off_inf, task->reg);
+
+	if (fd_bs) {
+		struct mpp_dma_buffer *bs_buf = mpp_dma_find_buffer_fd(session->dma, fd_bs);
+		int strm_len_by_hw = JPGDEC_GET_STRM_LEN(task->reg[JPGDEC_REG_STRM_LEN_BASE_INDEX]);
+		int strm_len = ((strm_len_by_hw + 1) << 4) + ofst_strm;
+
+		mpp_debug(DEBUG_EXTRA_INFO, "flush dmabuf fd %d size %d, hw_strm_len %d offset %d",
+				fd_bs, strm_len, strm_len_by_hw, ofst_strm);
+
+		if (bs_buf)
+			mpp_dma_buf_sync(bs_buf, 0, strm_len, DMA_TO_DEVICE, false);
+	}
+
 	return 0;
 }
 

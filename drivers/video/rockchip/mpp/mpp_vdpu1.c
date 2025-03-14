@@ -68,6 +68,9 @@
 #define	VDPU1_GET_FORMAT(x)		(((x) >> 28) & 0xf)
 #define VDPU1_GET_PROD_NUM(x)		(((x) >> 16) & 0xffff)
 #define VDPU1_GET_WIDTH(x)		(((x) & 0xff800000) >> 19)
+#define VDPU1_REG_STRM_LEN		0x018
+#define VDPU1_REG_STRM_LEN_BASE		(6)
+#define VDPU1_GET_STRM_LEN(x)		((x) & 0xffffff)
 #define	VDPU1_FMT_H264D			0
 #define	VDPU1_FMT_MPEG4D		1
 #define	VDPU1_FMT_H263D			2
@@ -234,6 +237,17 @@ static int vdpu_process_reg_fd(struct mpp_session *session,
 {
 	int ret = 0;
 	int fmt = VDPU1_GET_FORMAT(task->reg[VDPU1_REG_SYS_CTRL_INDEX]);
+	int fd_bs = -1;
+	int ofst_strm = 0;
+
+	if (session->msg_flags & MPP_FLAGS_REG_NO_OFFSET) {
+		fd_bs = task->reg[VDPU1_REG_STREAM_RLC_BASE_INDEX];
+		ofst_strm = mpp_query_reg_offset_info(&task->off_inf,
+						VDPU1_REG_STREAM_RLC_BASE_INDEX);
+	} else {
+		fd_bs = task->reg[VDPU1_REG_STREAM_RLC_BASE_INDEX] & 0x3ff;
+		ofst_strm = task->reg[VDPU1_REG_STREAM_RLC_BASE_INDEX] >> 10 << 4;
+	}
 
 	ret = mpp_translate_reg_address(session, &task->mpp_task,
 					fmt, task->reg, &task->off_inf);
@@ -281,6 +295,19 @@ static int vdpu_process_reg_fd(struct mpp_session *session,
 
 	mpp_translate_reg_offset_info(&task->mpp_task,
 				      &task->off_inf, task->reg);
+
+	if (fmt == VDPU1_FMT_JPEGD && fd_bs) {
+		struct mpp_dma_buffer *bs_buf = mpp_dma_find_buffer_fd(session->dma, fd_bs);
+		int strm_len_by_hw = VDPU1_GET_STRM_LEN(task->reg[VDPU1_REG_STRM_LEN_BASE]);
+		int strm_len = strm_len_by_hw + ofst_strm;
+
+		mpp_debug(DEBUG_EXTRA_INFO, "flush dmabuf fd %d size %d, hw_strm_len %d offset %d",
+				fd_bs, strm_len, strm_len_by_hw, ofst_strm);
+
+		if (bs_buf)
+			mpp_dma_buf_sync(bs_buf, 0, strm_len, DMA_TO_DEVICE, false);
+	}
+
 	return 0;
 fail:
 	return -EFAULT;
